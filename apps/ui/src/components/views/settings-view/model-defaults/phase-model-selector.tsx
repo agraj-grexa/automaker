@@ -459,6 +459,8 @@ export function PhaseModelSelector({
           // Get icon based on provider type
           const getIconForProviderType = () => {
             switch (provider.providerType) {
+              case 'bedrock':
+                return AnthropicIcon;
               case 'glm':
                 return GlmIcon;
               case 'minimax':
@@ -498,6 +500,8 @@ export function PhaseModelSelector({
         // Get icon based on provider type
         const getIconForProviderType = () => {
           switch (provider.providerType) {
+            case 'bedrock':
+              return AnthropicIcon;
             case 'glm':
               return GlmIcon;
             case 'minimax':
@@ -1350,6 +1354,8 @@ export function PhaseModelSelector({
     // Get icon based on provider type, falling back to model-based detection
     const getProviderTypeIcon = () => {
       switch (provider.providerType) {
+        case 'bedrock':
+          return AnthropicIcon;
         case 'glm':
           return GlmIcon;
         case 'minimax':

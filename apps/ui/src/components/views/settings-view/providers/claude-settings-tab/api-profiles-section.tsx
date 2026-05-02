@@ -64,6 +64,7 @@ function maskApiKey(key?: string): string {
 // Provider type display names
 const PROVIDER_TYPE_LABELS: Record<ClaudeCompatibleProviderType, string> = {
   anthropic: 'Anthropic',
+  bedrock: 'AWS Bedrock',
   glm: 'GLM',
   minimax: 'MiniMax',
   openrouter: 'OpenRouter',
@@ -73,6 +74,7 @@ const PROVIDER_TYPE_LABELS: Record<ClaudeCompatibleProviderType, string> = {
 // Provider type badge colors
 const PROVIDER_TYPE_COLORS: Record<ClaudeCompatibleProviderType, string> = {
   anthropic: 'bg-brand-500/20 text-brand-500',
+  bedrock: 'bg-orange-500/20 text-orange-400',
   glm: 'bg-emerald-500/20 text-emerald-500',
   minimax: 'bg-purple-500/20 text-purple-500',
   openrouter: 'bg-amber-500/20 text-amber-500',
