@@ -118,7 +118,3 @@ Bedrock support was added through the existing `ClaudeCompatibleProvider` system
 - Updated model count test from 5 to 7
 - Added tests for Claude Opus 4.7 and Sonnet 4.7
 - Updated default model assertion to Opus 4.7
-
-#### `docker-compose.yml`
-
-- Added `AWS_BEARER_TOKEN_BEDROCK` and `AWS_REGION` to the server environment block so they are forwarded from the host into the container
