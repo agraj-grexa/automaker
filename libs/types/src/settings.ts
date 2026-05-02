@@ -407,6 +407,7 @@ export type ApiKeySource = 'inline' | 'env' | 'credentials';
  */
 export type ClaudeCompatibleProviderType =
   | 'anthropic' // Direct Anthropic API (built-in)
+  | 'bedrock' // AWS Bedrock cross-region inference
   | 'glm' // z.AI GLM
   | 'minimax' // MiniMax
   | 'openrouter' // OpenRouter proxy
@@ -638,6 +639,59 @@ export const CLAUDE_PROVIDER_TEMPLATES: ClaudeCompatibleProviderTemplate[] = [
       { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1', mapsToClaudeModel: 'haiku' },
       { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1', mapsToClaudeModel: 'sonnet' },
       { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1', mapsToClaudeModel: 'opus' },
+    ],
+  },
+  {
+    templateId: 'bedrock',
+    name: 'AWS Bedrock',
+    providerType: 'bedrock',
+    baseUrl: '',
+    defaultApiKeySource: 'env',
+    useAuthToken: false,
+    timeoutMs: 3000000,
+    disableNonessentialTraffic: true,
+    description: 'Run Claude models via AWS Bedrock cross-region inference profiles',
+    defaultModels: [
+      {
+        id: 'us.anthropic.claude-opus-4-7',
+        displayName: 'Opus 4.7 (Bedrock)',
+        mapsToClaudeModel: 'opus',
+      },
+      {
+        id: 'us.anthropic.claude-sonnet-4-7',
+        displayName: 'Sonnet 4.7 (Bedrock)',
+        mapsToClaudeModel: 'sonnet',
+      },
+      {
+        id: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+        displayName: 'Haiku 4.5 (Bedrock)',
+        mapsToClaudeModel: 'haiku',
+      },
+      {
+        id: 'us.anthropic.claude-sonnet-4-6',
+        displayName: 'Sonnet 4.6 (Bedrock)',
+        mapsToClaudeModel: 'sonnet',
+      },
+      {
+        id: 'us.anthropic.claude-opus-4-6-v1',
+        displayName: 'Opus 4.6 (Bedrock)',
+        mapsToClaudeModel: 'opus',
+      },
+      {
+        id: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+        displayName: 'Sonnet 4.5 (Bedrock)',
+        mapsToClaudeModel: 'sonnet',
+      },
+      {
+        id: 'us.anthropic.claude-opus-4-1-20250805-v1:0',
+        displayName: 'Opus 4.1 (Bedrock)',
+        mapsToClaudeModel: 'opus',
+      },
+      {
+        id: 'us.anthropic.claude-opus-4-5-20251101-v1:0',
+        displayName: 'Opus 4.5 (Bedrock)',
+        mapsToClaudeModel: 'opus',
+      },
     ],
   },
 ];
