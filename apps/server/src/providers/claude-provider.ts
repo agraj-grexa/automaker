@@ -59,6 +59,7 @@ const AWS_ENV_VARS = [
   'AWS_DEFAULT_REGION',
   'AWS_REGION',
   'AWS_PROFILE',
+  'AWS_BEARER_TOKEN_BEDROCK',
 ];
 
 /**
@@ -117,6 +118,9 @@ function buildEnv(
     if (isClaudeCompatibleProvider(providerConfig) && providerConfig.providerType === 'bedrock') {
       env['CLAUDE_CODE_USE_BEDROCK'] = '1';
       env['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'] = '1';
+      if (process.env['CLAUDE_CODE_DISABLE_AUTO_MEMORY']) {
+        env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] = process.env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'];
+      }
       for (const key of AWS_ENV_VARS) {
         if (process.env[key]) {
           env[key] = process.env[key];
@@ -403,6 +407,31 @@ export class ClaudeProvider extends BaseProvider {
   getAvailableModels(): ModelDefinition[] {
     const models = [
       {
+        id: 'claude-opus-4-7',
+        name: 'Claude Opus 4.7',
+        modelString: 'claude-opus-4-7',
+        provider: 'anthropic',
+        description: 'Most capable Claude model',
+        contextWindow: 200000,
+        maxOutputTokens: 128000,
+        supportsVision: true,
+        supportsTools: true,
+        tier: 'premium' as const,
+        default: true,
+      },
+      {
+        id: 'claude-sonnet-4-7',
+        name: 'Claude Sonnet 4.7',
+        modelString: 'claude-sonnet-4-7',
+        provider: 'anthropic',
+        description: 'Balanced performance and cost',
+        contextWindow: 200000,
+        maxOutputTokens: 64000,
+        supportsVision: true,
+        supportsTools: true,
+        tier: 'standard' as const,
+      },
+      {
         id: 'claude-opus-4-6',
         name: 'Claude Opus 4.6',
         modelString: 'claude-opus-4-6',
@@ -413,7 +442,6 @@ export class ClaudeProvider extends BaseProvider {
         supportsVision: true,
         supportsTools: true,
         tier: 'premium' as const,
-        default: true,
       },
       {
         id: 'claude-sonnet-4-6',

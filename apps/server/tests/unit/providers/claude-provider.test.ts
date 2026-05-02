@@ -371,10 +371,27 @@ describe('claude-provider.ts', () => {
   });
 
   describe('getAvailableModels', () => {
-    it('should return 5 Claude models', () => {
+    it('should return 7 Claude models', () => {
       const models = provider.getAvailableModels();
 
-      expect(models).toHaveLength(5);
+      expect(models).toHaveLength(7);
+    });
+
+    it('should include Claude Opus 4.7', () => {
+      const models = provider.getAvailableModels();
+
+      const opus = models.find((m) => m.id === 'claude-opus-4-7');
+      expect(opus).toBeDefined();
+      expect(opus?.name).toBe('Claude Opus 4.7');
+      expect(opus?.provider).toBe('anthropic');
+    });
+
+    it('should include Claude Sonnet 4.7', () => {
+      const models = provider.getAvailableModels();
+
+      const sonnet = models.find((m) => m.id === 'claude-sonnet-4-7');
+      expect(sonnet).toBeDefined();
+      expect(sonnet?.name).toBe('Claude Sonnet 4.7');
     });
 
     it('should include Claude Opus 4.6', () => {
@@ -408,10 +425,10 @@ describe('claude-provider.ts', () => {
       expect(haiku).toBeDefined();
     });
 
-    it('should mark Opus as default', () => {
+    it('should mark Opus 4.7 as default', () => {
       const models = provider.getAvailableModels();
 
-      const opus = models.find((m) => m.id === 'claude-opus-4-6');
+      const opus = models.find((m) => m.id === 'claude-opus-4-7');
       expect(opus?.default).toBe(true);
     });
 
