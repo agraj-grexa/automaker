@@ -51,6 +51,17 @@ const SYSTEM_ENV_VARS = [
   'XDG_STATE_HOME',
 ];
 
+// AWS env vars forwarded to the SDK subprocess when using Bedrock
+const AWS_ENV_VARS = [
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'AWS_SESSION_TOKEN',
+  'AWS_DEFAULT_REGION',
+  'AWS_REGION',
+  'AWS_PROFILE',
+  'AWS_BEARER_TOKEN_BEDROCK',
+];
+
 /**
  * Check if the config is a ClaudeCompatibleProvider (new system)
  * by checking for the 'models' array property
@@ -102,43 +113,60 @@ function buildEnv(
         break;
     }
 
-    // Warn if no API key found
-    if (!apiKey) {
-      logger.warn(`No API key found for provider "${providerConfig.name}" with source "${source}"`);
-    }
-
-    // Authentication
-    if (providerConfig.useAuthToken) {
-      env['ANTHROPIC_AUTH_TOKEN'] = apiKey;
-    } else {
-      env['ANTHROPIC_API_KEY'] = apiKey;
-    }
-
-    // Endpoint configuration
-    env['ANTHROPIC_BASE_URL'] = providerConfig.baseUrl;
-    logger.debug(`[buildEnv] Set ANTHROPIC_BASE_URL to: ${providerConfig.baseUrl}`);
-
-    if (providerConfig.timeoutMs) {
-      env['API_TIMEOUT_MS'] = String(providerConfig.timeoutMs);
-    }
-
-    // Model mappings - only for legacy ClaudeApiProfile
-    // For ClaudeCompatibleProvider, the model is passed directly (no mapping needed)
-    if (!isClaudeCompatibleProvider(providerConfig) && providerConfig.modelMappings) {
-      if (providerConfig.modelMappings.haiku) {
-        env['ANTHROPIC_DEFAULT_HAIKU_MODEL'] = providerConfig.modelMappings.haiku;
-      }
-      if (providerConfig.modelMappings.sonnet) {
-        env['ANTHROPIC_DEFAULT_SONNET_MODEL'] = providerConfig.modelMappings.sonnet;
-      }
-      if (providerConfig.modelMappings.opus) {
-        env['ANTHROPIC_DEFAULT_OPUS_MODEL'] = providerConfig.modelMappings.opus;
-      }
-    }
-
-    // Traffic control
-    if (providerConfig.disableNonessentialTraffic) {
+    // Bedrock: use CLAUDE_CODE_USE_BEDROCK instead of API key + base URL.
+    // AWS IAM credentials come from standard AWS env vars, not ANTHROPIC_API_KEY.
+    if (isClaudeCompatibleProvider(providerConfig) && providerConfig.providerType === 'bedrock') {
+      env['CLAUDE_CODE_USE_BEDROCK'] = '1';
       env['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'] = '1';
+      if (process.env['CLAUDE_CODE_DISABLE_AUTO_MEMORY']) {
+        env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] = process.env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'];
+      }
+      for (const key of AWS_ENV_VARS) {
+        if (process.env[key]) {
+          env[key] = process.env[key];
+        }
+      }
+    } else {
+      // Non-Bedrock: warn if no API key, then set key and endpoint
+      if (!apiKey) {
+        logger.warn(
+          `No API key found for provider "${providerConfig.name}" with source "${source}"`
+        );
+      }
+
+      // Authentication
+      if (providerConfig.useAuthToken) {
+        env['ANTHROPIC_AUTH_TOKEN'] = apiKey;
+      } else {
+        env['ANTHROPIC_API_KEY'] = apiKey;
+      }
+
+      // Endpoint configuration
+      env['ANTHROPIC_BASE_URL'] = providerConfig.baseUrl;
+      logger.debug(`[buildEnv] Set ANTHROPIC_BASE_URL to: ${providerConfig.baseUrl}`);
+
+      if (providerConfig.timeoutMs) {
+        env['API_TIMEOUT_MS'] = String(providerConfig.timeoutMs);
+      }
+
+      // Model mappings - only for legacy ClaudeApiProfile
+      // For ClaudeCompatibleProvider, the model is passed directly (no mapping needed)
+      if (!isClaudeCompatibleProvider(providerConfig) && providerConfig.modelMappings) {
+        if (providerConfig.modelMappings.haiku) {
+          env['ANTHROPIC_DEFAULT_HAIKU_MODEL'] = providerConfig.modelMappings.haiku;
+        }
+        if (providerConfig.modelMappings.sonnet) {
+          env['ANTHROPIC_DEFAULT_SONNET_MODEL'] = providerConfig.modelMappings.sonnet;
+        }
+        if (providerConfig.modelMappings.opus) {
+          env['ANTHROPIC_DEFAULT_OPUS_MODEL'] = providerConfig.modelMappings.opus;
+        }
+      }
+
+      // Traffic control
+      if (providerConfig.disableNonessentialTraffic) {
+        env['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'] = '1';
+      }
     }
   } else {
     // Use direct Anthropic API - pass through credentials or environment variables
@@ -147,19 +175,24 @@ function buildEnv(
     // 2. Claude Max plan: Uses CLI OAuth auth (SDK handles this automatically)
     // 3. Custom endpoints via ANTHROPIC_BASE_URL env var (backward compatibility)
     //
-    // Priority: credentials file (UI settings) -> environment variable
-    // Note: Only auth and endpoint vars are passed. Model mappings and traffic
-    // control are NOT passed (those require a profile for explicit configuration).
-    if (credentials?.apiKeys?.anthropic) {
-      env['ANTHROPIC_API_KEY'] = credentials.apiKeys.anthropic;
-    } else if (process.env.ANTHROPIC_API_KEY) {
-      env['ANTHROPIC_API_KEY'] = process.env.ANTHROPIC_API_KEY;
+    // For CLI OAuth (no explicit API key), inherit the full process.env so the
+    // claude subprocess can access credentials from the OS keychain or config files.
+    // On macOS, OAuth tokens live in the Keychain and require the full environment.
+    // When an API key is explicitly configured, use a clean env (only SYSTEM_ENV_VARS)
+    // to avoid leaking unrelated environment variables to the subprocess.
+    const explicitApiKey = credentials?.apiKeys?.anthropic || process.env.ANTHROPIC_API_KEY;
+    const explicitAuthToken = process.env.ANTHROPIC_AUTH_TOKEN;
+
+    if (!explicitApiKey && !explicitAuthToken) {
+      // CLI OAuth mode: inherit full process.env so keychain/config auth works
+      Object.assign(env, process.env);
     }
-    // If using Claude Max plan via CLI auth, the SDK handles auth automatically
-    // when no API key is provided. We don't set ANTHROPIC_AUTH_TOKEN here
-    // unless it was explicitly set in process.env (rare edge case).
-    if (process.env.ANTHROPIC_AUTH_TOKEN) {
-      env['ANTHROPIC_AUTH_TOKEN'] = process.env.ANTHROPIC_AUTH_TOKEN;
+
+    if (explicitApiKey) {
+      env['ANTHROPIC_API_KEY'] = explicitApiKey;
+    }
+    if (explicitAuthToken) {
+      env['ANTHROPIC_AUTH_TOKEN'] = explicitAuthToken;
     }
     // Pass through ANTHROPIC_BASE_URL if set in environment (backward compatibility)
     if (process.env.ANTHROPIC_BASE_URL) {
@@ -167,7 +200,7 @@ function buildEnv(
     }
   }
 
-  // Always add system vars from process.env
+  // Always add system vars from process.env (no-op if already inherited above)
   for (const key of SYSTEM_ENV_VARS) {
     if (process.env[key]) {
       env[key] = process.env[key];
@@ -374,6 +407,31 @@ export class ClaudeProvider extends BaseProvider {
   getAvailableModels(): ModelDefinition[] {
     const models = [
       {
+        id: 'claude-opus-4-7',
+        name: 'Claude Opus 4.7',
+        modelString: 'claude-opus-4-7',
+        provider: 'anthropic',
+        description: 'Most capable Claude model',
+        contextWindow: 200000,
+        maxOutputTokens: 128000,
+        supportsVision: true,
+        supportsTools: true,
+        tier: 'premium' as const,
+        default: true,
+      },
+      {
+        id: 'claude-sonnet-4-7',
+        name: 'Claude Sonnet 4.7',
+        modelString: 'claude-sonnet-4-7',
+        provider: 'anthropic',
+        description: 'Balanced performance and cost',
+        contextWindow: 200000,
+        maxOutputTokens: 64000,
+        supportsVision: true,
+        supportsTools: true,
+        tier: 'standard' as const,
+      },
+      {
         id: 'claude-opus-4-6',
         name: 'Claude Opus 4.6',
         modelString: 'claude-opus-4-6',
@@ -384,7 +442,6 @@ export class ClaudeProvider extends BaseProvider {
         supportsVision: true,
         supportsTools: true,
         tier: 'premium' as const,
-        default: true,
       },
       {
         id: 'claude-sonnet-4-6',

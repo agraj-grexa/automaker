@@ -371,10 +371,27 @@ describe('claude-provider.ts', () => {
   });
 
   describe('getAvailableModels', () => {
-    it('should return 5 Claude models', () => {
+    it('should return 7 Claude models', () => {
       const models = provider.getAvailableModels();
 
-      expect(models).toHaveLength(5);
+      expect(models).toHaveLength(7);
+    });
+
+    it('should include Claude Opus 4.7', () => {
+      const models = provider.getAvailableModels();
+
+      const opus = models.find((m) => m.id === 'claude-opus-4-7');
+      expect(opus).toBeDefined();
+      expect(opus?.name).toBe('Claude Opus 4.7');
+      expect(opus?.provider).toBe('anthropic');
+    });
+
+    it('should include Claude Sonnet 4.7', () => {
+      const models = provider.getAvailableModels();
+
+      const sonnet = models.find((m) => m.id === 'claude-sonnet-4-7');
+      expect(sonnet).toBeDefined();
+      expect(sonnet?.name).toBe('Claude Sonnet 4.7');
     });
 
     it('should include Claude Opus 4.6', () => {
@@ -408,10 +425,10 @@ describe('claude-provider.ts', () => {
       expect(haiku).toBeDefined();
     });
 
-    it('should mark Opus as default', () => {
+    it('should mark Opus 4.7 as default', () => {
       const models = provider.getAvailableModels();
 
-      const opus = models.find((m) => m.id === 'claude-opus-4-6');
+      const opus = models.find((m) => m.id === 'claude-opus-4-7');
       expect(opus?.default).toBe(true);
     });
 
@@ -495,6 +512,96 @@ describe('claude-provider.ts', () => {
       const config = provider.getConfig();
       expect(config.apiKey).toBe('key1');
       expect(config.model).toBe('model1');
+    });
+  });
+
+  describe('buildEnv for Bedrock provider', () => {
+    it('should set CLAUDE_CODE_USE_BEDROCK=1 and pass AWS env vars', async () => {
+      process.env.AWS_ACCESS_KEY_ID = 'test-key-id';
+      process.env.AWS_SECRET_ACCESS_KEY = 'test-secret';
+      process.env.AWS_DEFAULT_REGION = 'us-east-1';
+
+      vi.mocked(sdk.query).mockReturnValue(
+        (async function* () {
+          yield { type: 'text', text: 'ok' };
+        })()
+      );
+
+      const bedrockProvider: import('@automaker/types').ClaudeCompatibleProvider = {
+        id: 'test-bedrock',
+        name: 'AWS Bedrock',
+        providerType: 'bedrock',
+        enabled: true,
+        baseUrl: '',
+        apiKeySource: 'env',
+        useAuthToken: false,
+        disableNonessentialTraffic: true,
+        models: [
+          {
+            id: 'us.anthropic.claude-sonnet-4-6',
+            displayName: 'Sonnet 4.6 (Bedrock)',
+            mapsToClaudeModel: 'sonnet',
+          },
+        ],
+      };
+
+      const generator = provider.executeQuery({
+        prompt: 'Test',
+        model: 'us.anthropic.claude-sonnet-4-6',
+        cwd: '/test',
+        claudeCompatibleProvider: bedrockProvider,
+      });
+
+      await collectAsyncGenerator(generator);
+
+      const callArgs = vi.mocked(sdk.query).mock.calls[0][0];
+      const env = callArgs.options?.env as Record<string, string | undefined>;
+
+      expect(env['CLAUDE_CODE_USE_BEDROCK']).toBe('1');
+      expect(env['AWS_ACCESS_KEY_ID']).toBe('test-key-id');
+      expect(env['AWS_SECRET_ACCESS_KEY']).toBe('test-secret');
+      expect(env['AWS_DEFAULT_REGION']).toBe('us-east-1');
+      expect(env['ANTHROPIC_API_KEY']).toBeUndefined();
+      expect(env['ANTHROPIC_BASE_URL']).toBeUndefined();
+
+      delete process.env.AWS_ACCESS_KEY_ID;
+      delete process.env.AWS_SECRET_ACCESS_KEY;
+      delete process.env.AWS_DEFAULT_REGION;
+    });
+
+    it('should not set CLAUDE_CODE_USE_BEDROCK for non-bedrock providers', async () => {
+      vi.mocked(sdk.query).mockReturnValue(
+        (async function* () {
+          yield { type: 'text', text: 'ok' };
+        })()
+      );
+
+      const glmProvider: import('@automaker/types').ClaudeCompatibleProvider = {
+        id: 'test-glm',
+        name: 'z.AI GLM',
+        providerType: 'glm',
+        enabled: true,
+        baseUrl: 'https://api.z.ai/api/anthropic',
+        apiKeySource: 'inline',
+        apiKey: 'sk-test',
+        useAuthToken: true,
+        models: [{ id: 'GLM-4.7', displayName: 'GLM 4.7', mapsToClaudeModel: 'sonnet' }],
+      };
+
+      const generator = provider.executeQuery({
+        prompt: 'Test',
+        model: 'GLM-4.7',
+        cwd: '/test',
+        claudeCompatibleProvider: glmProvider,
+      });
+
+      await collectAsyncGenerator(generator);
+
+      const callArgs = vi.mocked(sdk.query).mock.calls[0][0];
+      const env = callArgs.options?.env as Record<string, string | undefined>;
+
+      expect(env['CLAUDE_CODE_USE_BEDROCK']).toBeUndefined();
+      expect(env['ANTHROPIC_BASE_URL']).toBe('https://api.z.ai/api/anthropic');
     });
   });
 });

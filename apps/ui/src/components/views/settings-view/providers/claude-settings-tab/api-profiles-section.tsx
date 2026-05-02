@@ -64,6 +64,7 @@ function maskApiKey(key?: string): string {
 // Provider type display names
 const PROVIDER_TYPE_LABELS: Record<ClaudeCompatibleProviderType, string> = {
   anthropic: 'Anthropic',
+  bedrock: 'AWS Bedrock',
   glm: 'GLM',
   minimax: 'MiniMax',
   openrouter: 'OpenRouter',
@@ -73,6 +74,7 @@ const PROVIDER_TYPE_LABELS: Record<ClaudeCompatibleProviderType, string> = {
 // Provider type badge colors
 const PROVIDER_TYPE_COLORS: Record<ClaudeCompatibleProviderType, string> = {
   anthropic: 'bg-brand-500/20 text-brand-500',
+  bedrock: 'bg-orange-500/20 text-orange-400',
   glm: 'bg-emerald-500/20 text-emerald-500',
   minimax: 'bg-purple-500/20 text-purple-500',
   openrouter: 'bg-amber-500/20 text-amber-500',
@@ -290,13 +292,18 @@ export function ApiProfilesSection() {
 
   // For fixed providers, API key is always required (inline only)
   // For others, only required when source is 'inline'
+  // For Bedrock, no API key or base URL needed — auth comes from AWS env vars
   const isFixedProvider = hasFixedSettings(formData.providerType);
+  const isBedrockProvider = formData.providerType === 'bedrock';
+  const apiKeyValid = isBedrockProvider
+    ? true
+    : isFixedProvider
+      ? formData.apiKey.length > 0
+      : formData.apiKeySource !== 'inline' || formData.apiKey.length > 0;
   const isFormValid =
     formData.name.trim().length > 0 &&
-    formData.baseUrl.trim().length > 0 &&
-    (isFixedProvider
-      ? formData.apiKey.length > 0
-      : formData.apiKeySource !== 'inline' || formData.apiKey.length > 0) &&
+    (isBedrockProvider || formData.baseUrl.trim().length > 0) &&
+    apiKeyValid &&
     !isDuplicateName;
 
   // Check model coverage
@@ -433,6 +440,7 @@ export function ApiProfilesSection() {
                     <SelectValue placeholder="Select provider type" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="bedrock">AWS Bedrock</SelectItem>
                     <SelectItem value="glm">GLM (z.AI)</SelectItem>
                     <SelectItem value="minimax">MiniMax</SelectItem>
                     <SelectItem value="openrouter">OpenRouter</SelectItem>
@@ -443,42 +451,54 @@ export function ApiProfilesSection() {
               </div>
             )}
 
-            {/* API Key - always shown first for fixed providers */}
-            <div className="space-y-2">
-              <Label htmlFor="provider-api-key">API Key</Label>
-              <div className="relative">
-                <Input
-                  id="provider-api-key"
-                  type={showApiKey ? 'text' : 'password'}
-                  value={formData.apiKey}
-                  onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-                  placeholder="Enter API key"
-                  className="pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                >
-                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </Button>
+            {/* API Key - hidden for Bedrock (uses AWS env vars instead) */}
+            {isBedrockProvider ? (
+              <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-sm text-muted-foreground space-y-1">
+                <p className="font-medium text-foreground">AWS credentials required</p>
+                <p className="text-xs">
+                  No API key needed. Set these environment variables before starting the server:
+                </p>
+                <code className="block text-xs mt-1 font-mono text-orange-400">
+                  AWS_BEARER_TOKEN_BEDROCK, AWS_REGION
+                </code>
               </div>
-              {currentTemplate?.apiKeyUrl && (
-                <a
-                  href={currentTemplate.apiKeyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-brand-500 hover:text-brand-400"
-                >
-                  Get API Key from {currentTemplate.name} <ExternalLink className="w-3 h-3" />
-                </a>
-              )}
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="provider-api-key">API Key</Label>
+                <div className="relative">
+                  <Input
+                    id="provider-api-key"
+                    type={showApiKey ? 'text' : 'password'}
+                    value={formData.apiKey}
+                    onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+                    placeholder="Enter API key"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                  >
+                    {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </Button>
+                </div>
+                {currentTemplate?.apiKeyUrl && (
+                  <a
+                    href={currentTemplate.apiKeyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-brand-500 hover:text-brand-400"
+                  >
+                    Get API Key from {currentTemplate.name} <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            )}
 
-            {/* Base URL - hidden for fixed providers since it's pre-configured */}
-            {!isFixedProvider && (
+            {/* Base URL - hidden for fixed providers and Bedrock (no custom endpoint needed) */}
+            {!isFixedProvider && !isBedrockProvider && (
               <div className="space-y-2">
                 <Label htmlFor="provider-base-url">API Base URL</Label>
                 <Input
@@ -490,8 +510,8 @@ export function ApiProfilesSection() {
               </div>
             )}
 
-            {/* Advanced options for non-fixed providers only */}
-            {!isFixedProvider && (
+            {/* Advanced options for non-fixed, non-Bedrock providers only */}
+            {!isFixedProvider && !isBedrockProvider && (
               <>
                 {/* API Key Source */}
                 <div className="space-y-2">
