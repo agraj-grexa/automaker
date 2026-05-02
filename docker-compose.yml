@@ -41,6 +41,10 @@ services:
       # Optional - Anthropic API key
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
 
+      # Optional - AWS Bedrock authentication (bearer token method)
+      - AWS_BEARER_TOKEN_BEDROCK=${AWS_BEARER_TOKEN_BEDROCK:-}
+      - AWS_REGION=${AWS_REGION:-}
+
       # Optional - Claude CLI OAuth credentials (for macOS users)
       # Extract with: ./scripts/get-claude-token.sh
       # This writes the OAuth tokens to ~/.claude/.credentials.json in the container
